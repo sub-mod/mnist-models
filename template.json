@@ -225,6 +225,6 @@
             "description": "Name of tensorflow Model Image",
             "value": "submod/inception-model",
             "required": true
-        },
+        }
     ]
 }
