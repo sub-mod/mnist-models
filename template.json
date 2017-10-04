@@ -1,0 +1,230 @@
+{
+    "kind": "Template",
+    "apiVersion": "v1",
+    "metadata": {
+        "name": "tensorflow-server",
+        "annotations": {
+            "description": "Tensorflow Serving server",
+            "tags": "tf-app"
+        }
+    },
+    "objects": [
+        {
+            "kind": "ImageStream",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APPLICATION_NAME}",
+                "labels": {
+                    "appid": "tf-app-server-${APPLICATION_NAME}",
+                    "appName": "${APPLICATION_NAME}"
+                }
+            }
+        },
+        {
+            "kind": "ImageStream",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APPLICATION_NAME}-s2i",
+                "labels": {
+                    "appid": "tf-app-server-${APPLICATION_NAME}",
+                    "appName": "${APPLICATION_NAME}"
+                }
+            },
+            "spec": {
+                "tags": [
+                    {
+                        "name": "latest",
+                        "from": {
+                            "kind": "DockerImage",
+                            "name": "submod/tensorflow-serving-s2i:latest"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "kind": "BuildConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APPLICATION_NAME}",
+                "labels": {
+                    "appid": "tf-app-server-${APPLICATION_NAME}",
+                    "appName": "${APPLICATION_NAME}"
+                }
+            },
+            "spec": {
+                "triggers": [
+                    {
+                        "type": "ConfigChange"
+                    },
+                    {
+                        "type": "ImageChange"
+                    }
+                ],
+                "source": {
+                    "type": "Git",
+                    "git": {
+                        "uri": "https://github.com/sub-mod/empty-repo"
+                    },
+                    "images": [
+                        {
+                            "from" : {
+                                "kind" : "DockerImage",
+                                "name": "${MODEL_IMAGE}:latest"
+                            },
+                            "paths": [
+                                {
+                                    "sourcePath": "${IMAGE_MODEL_PATH}",
+                                    "destinationDir": "1/"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                "strategy": {
+                    "type": "Source",
+                    "sourceStrategy": {
+                        "from": {
+                            "kind": "ImageStreamTag",
+                            "name": "${APPLICATION_NAME}-s2i:latest"
+                        }
+                    }
+                },
+                "output": {
+                    "to": {
+                        "kind": "ImageStreamTag",
+                        "name": "${APPLICATION_NAME}:latest"
+                    }
+                }
+            }
+        },
+        {
+            "kind": "DeploymentConfig",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APPLICATION_NAME}",
+                "labels": {
+                    "appid": "tf-app-server-${APPLICATION_NAME}",
+                    "appName": "${APPLICATION_NAME}"
+                }
+            },
+            "spec": {
+                "strategy": {
+                    "type": "Rolling"
+                },
+                "triggers": [
+                    {
+                        "type": "ConfigChange"
+                    },
+                    {
+                        "type": "ImageChange",
+                        "imageChangeParams": {
+                            "automatic": true,
+                            "containerNames": [
+                                "${APPLICATION_NAME}"
+                            ],
+                            "from": {
+                                "kind": "ImageStreamTag",
+                                "name": "${APPLICATION_NAME}:latest"
+                            }
+                        }
+                    }
+                ],
+                "replicas": 1,
+                "selector": {
+                    "deploymentconfig": "${APPLICATION_NAME}"
+                },
+                "template": {
+                    "metadata": {
+                        "labels": {
+                            "appid": "tf-app-server-${APPLICATION_NAME}",
+                            "deploymentconfig": "${APPLICATION_NAME}",
+                            "appName": "${APPLICATION_NAME}"
+                        }
+                    },
+                    "spec": {
+                        "containers": [
+                            {
+                                "env": [
+                                    {
+                                        "name": "MODEL_NAME",
+                                        "value": "${MODEL_NAME}"
+                                    },
+                                    {
+                                        "name": "MODEL_PATH",
+                                        "value": "${MODEL_PATH}"
+                                    }
+                                ],
+                                "name": "${APPLICATION_NAME}",
+                                "image": "${APPLICATION_NAME}:latest",
+                                "ports": [
+                                    {
+                                        "containerPort": 6006,
+                                        "protocol": "TCP"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                }
+            }
+        },
+        {
+            "kind": "Service",
+            "apiVersion": "v1",
+            "metadata": {
+                "name": "${APPLICATION_NAME}",
+                "labels": {
+                    "appid": "tf-app-server-${APPLICATION_NAME}",
+                    "appName": "${APPLICATION_NAME}"
+                }
+            },
+            "spec": {
+                "ports": [
+                    {
+                        "name": "6006-tcp",
+                        "protocol": "TCP",
+                        "port": 6006,
+                        "targetPort": 6006
+                    }
+                ],
+                "selector": {
+                    "deploymentconfig": "${APPLICATION_NAME}"
+                }
+            }
+        }
+    ],
+    "parameters": [
+        {
+            "name": "APPLICATION_NAME",
+            "description": "The name of the application.",
+            "value": "tf-inception",
+            "from": "[a-zA-Z0-9]{10}",
+            "required": true
+        },
+        {
+            "name": "IMAGE_MODEL_PATH",
+            "description": "location of model files in the Image.",
+            "value": "/models/inception/1/",
+            "required": false
+        },
+        {
+            "name": "MODEL_NAME",
+            "description": "Name of tensorflow Model",
+            "value": "inception",
+            "required": true
+        },
+        {
+            "name": "MODEL_PATH",
+            "description": "Sub-directory within /opt/app-root/src",
+            "value": "1",
+            "required": true
+        },
+        {
+            "name": "MODEL_IMAGE",
+            "description": "Name of tensorflow Model Image",
+            "value": "submod/inception-model",
+            "required": true
+        },
+    ]
+}
