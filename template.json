@@ -2,7 +2,7 @@
     "kind": "Template",
     "apiVersion": "v1",
     "metadata": {
-        "name": "tensorflow-server",
+        "name": "tensorflow-server-2",
         "annotations": {
             "description": "Tensorflow Serving server",
             "tags": "tf-app"
